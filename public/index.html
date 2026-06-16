@@ -1,0 +1,769 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, user-scalable=no"
+    />
+    <title>Collab QR Scanner</title>
+    <style>
+      :root {
+        --bg-primary: #0a0a0f;
+        --bg-secondary: #12121a;
+        --bg-tertiary: #1a1a25;
+        --success: #22c55e;
+        --success-glow: rgba(34, 197, 94, 0.3);
+        --text-primary: #f8fafc;
+        --text-secondary: #94a3b8;
+        --text-muted: #64748b;
+        --border-color: rgba(255, 255, 255, 0.08);
+        --glass-bg: rgba(255, 255, 255, 0.03);
+      }
+
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+        background: var(--bg-primary);
+        color: var(--text-primary);
+        min-height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        padding: 20px;
+        overflow-x: hidden;
+      }
+
+      /* Animated background gradient */
+      body::before {
+        content: "";
+        position: fixed;
+        top: -50%;
+        left: -50%;
+        width: 200%;
+        height: 200%;
+        background: radial-gradient(
+            circle at 20% 80%,
+            var(--accent-glow) 0%,
+            transparent 40%
+          ),
+          radial-gradient(
+            circle at 80% 20%,
+            rgba(139, 92, 246, 0.15) 0%,
+            transparent 40%
+          ),
+          radial-gradient(
+            circle at 50% 50%,
+            rgba(6, 182, 212, 0.1) 0%,
+            transparent 50%
+          );
+        animation: bgFloat 20s ease-in-out infinite;
+        pointer-events: none;
+        z-index: -1;
+      }
+
+      @keyframes bgFloat {
+        0%,
+        100% {
+          transform: translate(0, 0) rotate(0deg);
+        }
+        25% {
+          transform: translate(-5%, 5%) rotate(5deg);
+        }
+        50% {
+          transform: translate(5%, -5%) rotate(-5deg);
+        }
+        75% {
+          transform: translate(-3%, -3%) rotate(3deg);
+        }
+      }
+
+      .container {
+        max-width: 480px;
+        width: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 24px;
+      }
+
+      /* Header Section */
+      .header {
+        text-align: center;
+        margin-bottom: 8px;
+      }
+
+      .logo {
+        width: 64px;
+        height: 64px;
+        margin: 0 auto 16px;
+        background: linear-gradient(
+          135deg,
+          var(--accent-primary),
+          var(--accent-secondary)
+        );
+        border-radius: 16px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 32px var(--accent-glow);
+        animation: logoPulse 3s ease-in-out infinite;
+      }
+
+      @keyframes logoPulse {
+        0%,
+        100% {
+          transform: scale(1);
+          box-shadow: 0 8px 32px var(--accent-glow);
+        }
+        50% {
+          transform: scale(1.02);
+          box-shadow: 0 12px 40px var(--accent-glow);
+        }
+      }
+
+      .logo svg {
+        width: 36px;
+        height: 36px;
+        fill: white;
+      }
+
+      h1 {
+        font-size: 1.75rem;
+        font-weight: 700;
+        letter-spacing: -0.02em;
+        margin-bottom: 8px;
+        background: linear-gradient(
+          135deg,
+          var(--text-primary) 0%,
+          var(--text-secondary) 100%
+        );
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      .subtitle {
+        font-size: 0.95rem;
+        color: var(--text-secondary);
+        line-height: 1.5;
+      }
+
+      /* Scanner Card */
+      .scanner-card {
+        width: 100%;
+        background: var(--glass-bg);
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border: 1px solid var(--border-color);
+        border-radius: 24px;
+        padding: 24px;
+        box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+      }
+
+      #reader {
+        width: 100%;
+        aspect-ratio: 1;
+        border-radius: 16px;
+        overflow: hidden;
+        background: var(--bg-tertiary);
+        display: none;
+        position: relative;
+      }
+
+      #reader.active {
+        display: block;
+        animation: fadeIn 0.4s ease-out;
+      }
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      /* Scan button */
+      .scan-btn {
+        width: 100%;
+        padding: 18px 32px;
+        font-size: 1rem;
+        font-weight: 600;
+        font-family: inherit;
+        color: white;
+        background: linear-gradient(135deg, var(--accent-primary), #7c3aed);
+        border: none;
+        border-radius: 14px;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 20px var(--accent-glow);
+        position: relative;
+        overflow: hidden;
+      }
+
+      .scan-btn::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.2),
+          transparent
+        );
+        transition: left 0.5s ease;
+      }
+
+      .scan-btn:hover::before {
+        left: 100%;
+      }
+
+      .scan-btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 8px 32px var(--accent-glow);
+      }
+
+      .scan-btn:active {
+        transform: translateY(0);
+      }
+
+      .scan-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .scan-btn svg {
+        width: 22px;
+        height: 22px;
+      }
+
+      /* Stop button */
+      .stop-btn {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+        box-shadow: 0 4p 20px rgba(239, 68, 68, 0.3);
+        margin-top: 12px;
+      }
+
+      .stop-btn:hover {
+        box-shadow: 0 8px 32px rgba(239, 68, 68, 0.4);
+      }
+
+      /* Status Section */
+      .status-container {
+        width: 100%;
+        padding: 16px 20px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 14px;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--text-muted);
+        flex-shrink: 0;
+      }
+
+      .status-dot.waiting {
+        background: var(--text-muted);
+      }
+
+      .status-dot.scanning {
+        background: var(--accent-primary);
+        animation: pulse 1.5s ease-in-out infinite;
+      }
+
+      .status-dot.success {
+        background: var(--success);
+        box-shadow: 0 0 12px var(--success-glow);
+      }
+
+      .status-dot.error {
+        background: #ef4444;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+          transform: scale(1);
+        }
+        50% {
+          opacity: 0.6;
+          transform: scale(0.9);
+        }
+      }
+
+      .status-text {
+        font-size: 0.9rem;
+        color: var(--text-secondary);
+        flex: 1;
+      }
+
+      /* Log Section */
+      .log-container {
+        width: 100%;
+        padding: 14px 18px;
+        background: rgba(239, 68, 68, 0.08);
+        border: 1px solid rgba(239, 68, 68, 0.2);
+        border-radius: 12px;
+        display: none;
+      }
+
+      .log-container.visible {
+        display: block;
+        animation: fadeIn 0.3s ease-out;
+      }
+
+      .log-text {
+        font-size: 0.85rem;
+        color: #fca5a5;
+        word-break: break-all;
+      }
+
+      /* Connected users indicator */
+      .users-indicator {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        background: var(--glass-bg);
+        border: 1px solid var(--border-color);
+        border-radius: 100px;
+        font-size: 0.8rem;
+        color: var(--text-muted);
+        transition: all 0.3s ease;
+      }
+
+      .users-indicator.connected {
+        color: var(--success);
+        border-color: rgba(34, 197, 94, 0.3);
+        background: rgba(34, 197, 94, 0.1);
+      }
+
+      .users-indicator svg {
+        width: 16px;
+        height: 16px;
+        fill: currentColor;
+      }
+
+      /* Zoom controls */
+      .zoom-controls {
+        display: none;
+        width: 100%;
+        margin-top: 12px;
+        padding: 12px 16px;
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 12px;
+      }
+
+      .zoom-controls.visible {
+        display: block;
+        animation: fadeIn 0.3s ease-out;
+      }
+
+      .zoom-label {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 8px;
+        font-size: 0.85rem;
+        color: var(--text-secondary);
+      }
+
+      .zoom-value {
+        font-weight: 600;
+        color: var(--text-primary);
+      }
+
+      .zoom-slider {
+        width: 100%;
+        height: 8px;
+        -webkit-appearance: none;
+        appearance: none;
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+        outline: none;
+        cursor: pointer;
+        margin: 0;
+      }
+
+      .zoom-slider::-webkit-slider-runnable-track {
+        width: 100%;
+        height: 8px;
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+      }
+
+      .zoom-slider::-webkit-slider-thumb {
+        -webkit-appearance: none;
+        appearance: none;
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, #6a6a6a, #4b4b4b);
+        border-radius: 50%;
+        cursor: pointer;
+        box-shadow: 0 2px 8px rgba(128, 128, 128, 0.4);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
+        margin-top: -8px;
+        border: 2px solid #fff;
+      }
+
+      .zoom-slider::-webkit-slider-thumb:hover {
+        transform: scale(1.15);
+        box-shadow: 0 4px 12px rgba(147, 147, 147, 0.6);
+      }
+
+      .zoom-slider::-webkit-slider-thumb:active {
+        transform: scale(1.05);
+      }
+
+      .zoom-slider::-moz-range-track {
+        width: 100%;
+        height: 8px;
+        background: var(--bg-tertiary);
+        border-radius: 4px;
+      }
+
+      .zoom-slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+        background: linear-gradient(135deg, #6a6a6a, #4b4b4b);
+        border-radius: 50%;
+        cursor: pointer;
+        border: 2px solid #fff;
+        box-shadow: 0 2px 8px rgba(147, 147, 147, 0.6);
+      }
+
+      .zoom-slider::-moz-range-thumb:hover {
+        transform: scale(1.15);
+      }
+
+      /* Override html5-qrcode styles */
+      #reader video {
+        border-radius: 12px !important;
+      }
+
+      #reader__scan_region {
+        background: transparent !important;
+      }
+
+      #reader__dashboard {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <header class="header">
+        <div class="logo">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+            <path
+              d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
+            />
+          </svg>
+        </div>
+        <h1>Collaborative QR Scanner</h1>
+        <p class="subtitle">Scan once, redirect everyone.</p>
+      </header>
+
+      <!-- Users Indicator -->
+      <div class="users-indicator">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+          <path
+            d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"
+          />
+        </svg>
+        <span id="connectionStatus">Connected</span>
+      </div>
+
+      <!-- Scanner Card -->
+      <div class="scanner-card">
+        <div id="reader"></div>
+        <button class="scan-btn" id="startScan">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="currentColor"
+          >
+            <path
+              d="M9.5 6.5v3h-3v-3h3M11 5H5v6h6V5zm-1.5 9.5v3h-3v-3h3M11 13H5v6h6v-6zm6.5-6.5v3h-3v-3h3M19 5h-6v6h6V5zm-6 8h1.5v1.5H13V13zm1.5 1.5H16V16h-1.5v-1.5zM16 13h1.5v1.5H16V13zm-3 3h1.5v1.5H13V16zm1.5 1.5H16V19h-1.5v-1.5zM16 16h1.5v1.5H16V16zm1.5-1.5H19V16h-1.5v-1.5zm0 3H19V19h-1.5v-1.5zM19 13h1.5v1.5H19V13zm0 3H19v1.5h-1.5V16z"
+            />
+          </svg>
+          <span id="btnText">Start Scanning</span>
+        </button>
+        <div class="zoom-controls" id="zoomControls">
+          <div class="zoom-label">
+            <span>Zoom</span>
+            <span class="zoom-value" id="zoomValue">1.0x</span>
+          </div>
+          <input
+            type="range"
+            class="zoom-slider"
+            id="zoomSlider"
+            min="1"
+            max="5"
+            step="0.1"
+            value="1"
+          />
+        </div>
+      </div>
+
+      <!-- Status -->
+      <div class="status-container">
+        <span class="status-dot waiting" id="statusDot"></span>
+        <span class="status-text" id="statusMsg">Ready to scan</span>
+      </div>
+
+      <!-- Log (Error Messages) -->
+      <div class="log-container" id="logContainer">
+        <span class="log-text" id="logs"></span>
+      </div>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script
+      src="https://unpkg.com/html5-qrcode@2.3.8"
+      type="text/javascript"
+    ></script>
+
+    <script>
+      const socket = io();
+      const statusMsg = document.getElementById("statusMsg");
+      const statusDot = document.getElementById("statusDot");
+      const logContainer = document.getElementById("logContainer");
+      const logDiv = document.getElementById("logs");
+      const startBtn = document.getElementById("startScan");
+      const btnText = document.getElementById("btnText");
+      const readerDiv = document.getElementById("reader");
+
+      let html5QrCode = null;
+      let isScanning = false;
+      let currentVideoTrack = null;
+      let zoomCapabilities = null;
+
+      // Zoom controls
+      const zoomControls = document.getElementById("zoomControls");
+      const zoomSlider = document.getElementById("zoomSlider");
+      const zoomValue = document.getElementById("zoomValue");
+
+      zoomSlider.addEventListener("input", async (e) => {
+        const zoom = parseFloat(e.target.value);
+        zoomValue.textContent = zoom.toFixed(1) + "x";
+        await applyZoom(zoom);
+      });
+
+      async function applyZoom(zoomLevel) {
+        if (currentVideoTrack && zoomCapabilities) {
+          try {
+            await currentVideoTrack.applyConstraints({
+              advanced: [{ zoom: zoomLevel }],
+            });
+          } catch (err) {
+            console.log("Zoom not supported:", err);
+          }
+        }
+      }
+
+      async function setupZoomControls(videoTrack) {
+        currentVideoTrack = videoTrack;
+        const capabilities = videoTrack.getCapabilities();
+
+        if (capabilities.zoom) {
+          zoomCapabilities = capabilities.zoom;
+          zoomSlider.min = capabilities.zoom.min;
+          zoomSlider.max = Math.min(capabilities.zoom.max, 10); // Cap at 10x
+          zoomSlider.step = capabilities.zoom.step || 0.1;
+          zoomSlider.value = 1;
+          zoomValue.textContent = "1.0x";
+          zoomControls.classList.add("visible");
+        } else {
+          zoomControls.classList.remove("visible");
+        }
+      }
+
+      // Connection status
+      const usersIndicator = document.querySelector(".users-indicator");
+
+      socket.on("connect", () => {
+        usersIndicator.classList.add("connected");
+      });
+
+      socket.on("disconnect", () => {
+        document.getElementById("connectionStatus").textContent =
+          "Reconnecting...";
+        usersIndicator.classList.remove("connected");
+      });
+
+      // Online user count
+      socket.on("user_count", (count) => {
+        document.getElementById("connectionStatus").textContent =
+          count + " online";
+      });
+
+      // Listen for Broadcasts from Server
+      socket.on("navigate_now", (url) => {
+        window.location.href = url;
+      });
+
+      // Handle Scanning Logic
+      startBtn.addEventListener("click", async () => {
+        if (isScanning) {
+          // Stop scanning
+          await stopScanning();
+        } else {
+          // Start scanning
+          await startScanning();
+        }
+      });
+
+      async function startScanning() {
+        try {
+          setStatus("scanning", "Initializing camera...");
+          logContainer.classList.remove("visible");
+          zoomControls.classList.remove("visible");
+
+          html5QrCode = new Html5Qrcode("reader");
+          readerDiv.classList.add("active");
+
+          // Enhanced configuration for better detection of smaller QR codes
+          const config = {
+            fps: 15, // Higher FPS for faster detection
+            qrbox: function (viewfinderWidth, viewfinderHeight) {
+              const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+              const qrboxSize = minEdge;
+              return { width: qrboxSize, height: qrboxSize };
+            },
+            aspectRatio: 1.0,
+            formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true, // Use native detector when available
+            },
+            rememberLastUsedCamera: true,
+            // Don't show built-in UI
+            showTorchButtonIfSupported: true,
+            showZoomSliderIfSupported: true,
+          };
+
+          await html5QrCode.start(
+            { facingMode: "environment" },
+            config,
+            (decodedText, decodedResult) => {
+              handleScanSuccess(decodedText);
+            },
+            (errorMessage) => {
+              // Silently handle scan failures (normal during scanning)
+            }
+          );
+
+          // Setup zoom controls if camera supports it
+          try {
+            const videoElement = document.querySelector("#reader video");
+            if (videoElement && videoElement.srcObject) {
+              const tracks = videoElement.srcObject.getVideoTracks();
+              if (tracks.length > 0) {
+                await setupZoomControls(tracks[0]);
+              }
+            }
+          } catch (err) {
+            console.log("Could not setup zoom:", err);
+          }
+
+          isScanning = true;
+          btnText.textContent = "Stop Scanning";
+          startBtn.classList.add("stop-btn");
+          setStatus(
+            "scanning",
+            "Scanning for QR codes... Use zoom for distant codes"
+          );
+        } catch (err) {
+          console.error("Camera error:", err);
+          setStatus("error", "Camera access denied or unavailable");
+          showLog("Error: " + err.message);
+          readerDiv.classList.remove("active");
+        }
+      }
+
+      async function stopScanning() {
+        if (html5QrCode && isScanning) {
+          try {
+            await html5QrCode.stop();
+            html5QrCode = null;
+          } catch (err) {
+            console.error("Stop error:", err);
+          }
+        }
+
+        isScanning = false;
+        currentVideoTrack = null;
+        zoomCapabilities = null;
+        readerDiv.classList.remove("active");
+        readerDiv.innerHTML = "";
+        zoomControls.classList.remove("visible");
+        zoomSlider.value = 1;
+        zoomValue.textContent = "1.0x";
+        btnText.textContent = "Start Scanning";
+        startBtn.classList.remove("stop-btn");
+        setStatus("waiting", "Ready to scan");
+      }
+
+      async function handleScanSuccess(url) {
+        // Stop scanning first
+        await stopScanning();
+
+        // Validate URL
+        if (!url.startsWith("http")) {
+          setStatus("error", "Not a valid URL");
+          showLog(`Scanned data is not a URL: ${url}`);
+          return;
+        }
+
+        setStatus("success", `Redirecting to scanned link...`);
+
+        // Send to server for broadcast and wait for acknowledgement
+        socket.emit("scan_success", url, (response) => {
+          // Server has confirmed receipt, now safe to redirect
+          window.location.href = url;
+        });
+
+        // Fallback: redirect after 500ms even if no ack received
+        setTimeout(() => {
+          window.location.href = url;
+        }, 500);
+      }
+
+      function setStatus(state, message) {
+        statusDot.className = "status-dot " + state;
+        statusMsg.textContent = message;
+      }
+
+      function showLog(message) {
+        logDiv.textContent = message;
+        logContainer.classList.add("visible");
+      }
+    </script>
+  </body>
+</html>

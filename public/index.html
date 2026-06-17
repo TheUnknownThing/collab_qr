@@ -577,31 +577,57 @@
       });
 
       async function applyZoom(zoomLevel) {
-        if (currentVideoTrack && zoomCapabilities) {
+        if (!currentVideoTrack) return;
+
+        if (zoomCapabilities) {
           try {
-            await currentVideoTrack.applyConstraints({
-              advanced: [{ zoom: zoomLevel }],
-            });
+            await currentVideoTrack.applyConstraints({ zoom: zoomLevel });
+            return;
           } catch (err) {
-            console.log("Zoom not supported:", err);
+            try {
+              await currentVideoTrack.applyConstraints({
+                advanced: [{ zoom: zoomLevel }],
+              });
+              return;
+            } catch (err2) {
+              console.log("Native zoom not supported, using CSS fallback:", err2);
+            }
           }
+        }
+
+        const videoEl = document.querySelector("#reader video");
+        if (videoEl) {
+          videoEl.style.transform = `scale(${zoomLevel})`;
+          videoEl.style.transformOrigin = "center center";
         }
       }
 
       async function setupZoomControls(videoTrack) {
         currentVideoTrack = videoTrack;
-        const capabilities = videoTrack.getCapabilities();
+
+        let capabilities = {};
+        try {
+          capabilities = videoTrack.getCapabilities ? videoTrack.getCapabilities() : {};
+        } catch (e) {
+          capabilities = {};
+        }
 
         if (capabilities.zoom) {
           zoomCapabilities = capabilities.zoom;
           zoomSlider.min = capabilities.zoom.min;
-          zoomSlider.max = Math.min(capabilities.zoom.max, 10); // Cap at 10x
+          zoomSlider.max = Math.min(capabilities.zoom.max, 10);
           zoomSlider.step = capabilities.zoom.step || 0.1;
           zoomSlider.value = 1;
           zoomValue.textContent = "1.0x";
           zoomControls.classList.add("visible");
         } else {
-          zoomControls.classList.remove("visible");
+          zoomCapabilities = null;
+          zoomSlider.min = 1;
+          zoomSlider.max = 5;
+          zoomSlider.step = 0.1;
+          zoomSlider.value = 1;
+          zoomValue.textContent = "1.0x";
+          zoomControls.classList.add("visible");
         }
       }
 
@@ -681,12 +707,20 @@
 
           // Setup zoom controls if camera supports it
           try {
-            const videoElement = document.querySelector("#reader video");
-            if (videoElement && videoElement.srcObject) {
-              const tracks = videoElement.srcObject.getVideoTracks();
-              if (tracks.length > 0) {
-                await setupZoomControls(tracks[0]);
+            let videoTrack = null;
+            for (let i = 0; i < 20; i++) {
+              await new Promise((r) => setTimeout(r, 200));
+              const videoElement = document.querySelector("#reader video");
+              if (videoElement && videoElement.srcObject) {
+                const tracks = videoElement.srcObject.getVideoTracks();
+                if (tracks.length > 0) {
+                  videoTrack = tracks[0];
+                  break;
+                }
               }
+            }
+            if (videoTrack) {
+              await setupZoomControls(videoTrack);
             }
           } catch (err) {
             console.log("Could not setup zoom:", err);
